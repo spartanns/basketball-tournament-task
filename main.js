@@ -15,6 +15,21 @@ const initializeValues = (grp) => {
   }
 };
 
+for (let i = 0; i < 3; i++) {
+  initializeValues([a, b, c][i]);
+}
+
+const updateStats = (team1, team2, val1, val2) => {
+  team1.wins++;
+  team1.points += 2;
+  team1.goalsWon += val1;
+  team1.goalsLost += val2;
+  team2.losses++;
+  team2.points++;
+  team2.goalsWon += val2;
+  team2.goalsLost += val1;
+};
+
 const simulateGame = (team1, team2) => {
   const score = [];
   const rankDiff = team2['FIBARanking'] - team1['FIBARanking'];
@@ -33,6 +48,7 @@ const simulateGame = (team1, team2) => {
       val2 = Math.round(Math.random() * 200);
     } while (val2 > val1);
 
+    updateStats(team1, team2, val1, val2);
     score.push(val1, val2);
   } else if (winner['ISOCode'] === team2['ISOCode']) {
     let [val1, val2] = [0, 0];
@@ -45,6 +61,7 @@ const simulateGame = (team1, team2) => {
       val1 = Math.round(Math.random() * 200);
     } while (val1 > val2);
 
+    updateStats(team2, team1, val2, val1);
     score.push(val1, val2);
   }
 
@@ -52,13 +69,24 @@ const simulateGame = (team1, team2) => {
 };
 
 const firstPhase = (grp) => {
-  for (let i = 0; i < 3; i++) {
-    initializeValues([a, b, c][i]);
-  }
 
   simulateGame(grp[0], grp[2]);
   simulateGame(grp[1], grp[3]);
 };
+
+const secondPhase = (grp) => {
+  simulateGame(grp[1], grp[0]);
+  simulateGame(grp[2], grp[3]);
+};
+
+const thirdPhase = (grp) => {
+  simulateGame(grp[3], grp[0]);
+  simulateGame(grp[1], grp[2]);
+
+  grp.sort((a, b) => {
+    return b.points - a.points;
+  })
+}
 
 console.log("Grupna faza - I kolo:");
 for (let i = 0; i < 3; i++) {
@@ -66,4 +94,26 @@ for (let i = 0; i < 3; i++) {
   firstPhase([a, b, c][i]);
 }
 
+console.log();
+console.log("Grupna faza - II kolo:");
+for (let i = 0; i < 3; i++) {
+  console.log(`\tGrupa ${['A', 'B', 'C'][i]}:`);
+  secondPhase([a, b, c][i]);
+}
 
+console.log();
+console.log('Grupna faza - III kolo:');
+for (let i = 0; i < 3; i++) {
+  console.log(`\tGrupa ${['A', 'B', 'C'][i]}`);
+  thirdPhase([a, b, c][i]);
+}
+
+console.log();
+console.log('Konačan plasman u grupama:');
+for (let i = 0; i < 3; i++) {
+  console.log(`\tGrupa ${['A', 'B', 'C'][i]} (ime - wins/losses/points/scored/lost/difference)`);
+  for (let j = 0; j < a.length; j++) {
+    console.log(`\t\t${j + 1}. ${[a, b, c][i][j]['Team']}\t${[a, b, c][i][j].wins}/${[a, b, c][i][j].losses}/${[a, b, c][i][j].points}/${[a, b, c][i][j].goalsWon}/${[a, b, c][i][j].goalsLost}/${[a, b, c][i][j].goalsWon - [a, b, c][i][j].goalsLost}`);
+  }
+
+}
