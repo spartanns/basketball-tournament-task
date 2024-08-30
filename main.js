@@ -23,6 +23,7 @@ const calculateExpectedScore = (rating1, rating2) => {
   return 1 / (1 + Math.pow(10, (rating1 - rating2) / 10));
 }
 
+// use elo rating as the leading factor
 const adjustWithElo = (fiba1, fiba2, rating1, rating2) => {
   const eloFactor = (rating2 - rating1) / 10;
   const fiba = fiba1 + eloFactor * 10;
@@ -30,6 +31,7 @@ const adjustWithElo = (fiba1, fiba2, rating1, rating2) => {
   return calculateExpectedScore(fiba, fiba2);
 }
 
+// use fiba rating as the leading factor
 const adjustWithFiba = (rating1, rating2, fiba1, fiba2) => {
   const fibaFactor = (fiba2 - fiba1) / 10;
   const rating = rating1 + fibaFactor * 10;
@@ -115,8 +117,15 @@ const thirdPhase = (grp) => {
   simulateGame(grp[1], grp[2]);
 
   grp.sort((a, b) => {
+    if (a.points === b.points) {
+      for (let j of a.matches) {
+        if (j.opponent === b['ISOCode']) {
+          return 0 - j.outcome;
+        }
+      }
+    }
     return b.points - a.points;
-  })
+  });
 }
 
 const elimination = (a, b) => {
@@ -240,18 +249,6 @@ const simulate = () => {
     thirdPhase([a, b, c][i]);
   }
 
-  for (let i = 0; i < 3; i++) {
-    [a, b, c][i].sort((a, b) => {
-      if (a.points === b.points) {
-        for (let j of a.matches) {
-          if (j.opponent === b['ISOCode']) {
-            return 0 - j.outcome;
-          }
-        }
-      }
-      return b.points - a.points;
-    });
-  }
 
   console.log();
   console.log('Konačan plasman u grupama:');
