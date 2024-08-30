@@ -1,26 +1,65 @@
 const fs = require('fs');
 const data = fs.readFileSync('groups.json', 'utf8');
+const data2 = fs.readFileSync('exibitions.json', 'utf8');
 const groups = JSON.parse(data);
-
-const [a, b, c] = [groups['A'], groups['B'], groups['C']];
-const [d, e, f, g] = [[], [], [], []];
-const quarters = [];
-const semi = [];
-const finals = [];
-const bronze = [];
-const medals = [];
+const exibitions = JSON.parse(data2);
+const K_FACTOR = 32;
+const [quarters, semi, bronze, finals, medals] = [[], [], [], [], []];
 let ranked = [];
 
 const initializeValues = (grp) => {
   for (let i of grp) {
-    [i.wins, i.losses, i.points, i.goalsWon, i.goalsLost, i.matches] = [0, 0, 0, 0, 0, []];
+    [i.wins, i.losses, i.points, i.goalsWon, i.goalsLost, i.elo, i.matches] = [0, 0, 0, 0, 0, 0, []];
+  }
+};
+
+const updateEloRating = (rating1, rating2, actualScore) => {
+  const expectedScore = calculateExpectedScore(rating1, rating2);
+
+  return rating1 + K_FACTOR * (actualScore - expectedScore);
+}
+
+const calculateExpectedScore = (rating1, rating2) => {
+  return 1 / (1 + Math.pow(10, (rating1 - rating2) / 10));
+}
+
+const adjustWithElo = (fiba1, fiba2, rating1, rating2) => {
+  const eloFactor = (rating2 - rating1) / 10;
+  const fiba = fiba1 + eloFactor * 10;
+
+  return calculateExpectedScore(fiba, fiba2);
+}
+
+const adjustWithFiba = (rating1, rating2, fiba1, fiba2) => {
+  const fibaFactor = (fiba2 - fiba1) / 10;
+  const rating = rating1 + fibaFactor * 10;
+
+  return calculateExpectedScore(rating, rating2);
+};
+
+const generateEloRating = (grp) => {
+  for (let i in grp) {
+    grp[i].elo = 0;
+
+    for (let j in exibitions) {
+      if (grp[i]['ISOCode'] === j) {
+
+        for (let k = 0; k < 2; k++) {
+          const score = [];
+          const result = exibitions[j][k]['Result'].split('-');
+
+          score.push(parseInt(result[0]), parseInt(result[1]));
+          if (score[0] > score[1]) grp[i].elo++;
+          if (score[2] > score[3]) grp[i].elo++;
+        }
+      }
+    }
   }
 };
 
 const simulateGame = (team1, team2) => {
   const score = [];
-  const rankDiff = team2['FIBARanking'] - team1['FIBARanking'];
-  const probability = 1 / (1 + Math.exp(rankDiff / 10)); // logisitc function for win probability
+  const probability = adjustWithFiba(team1.elo, team2.elo, team1['FIBARanking'], team2['FIBARanking']);
   const random = Math.random();
   const winner = random < probability ? team1 : team2;
 
@@ -37,6 +76,8 @@ const simulateGame = (team1, team2) => {
 
     updateStats(team1, team2, val1, val2);
     score.push(val1, val2);
+    team1.elo = updateEloRating(team1.elo, team2.elo, 1);
+    team2.elo = updateEloRating(team2.elo, team1.elo, 0);
   } else if (winner['ISOCode'] === team2['ISOCode']) {
     let [val1, val2] = [0, 0];
 
@@ -50,6 +91,8 @@ const simulateGame = (team1, team2) => {
 
     updateStats(team2, team1, val2, val1);
     score.push(val1, val2);
+    team2.elo = updateEloRating(team2.elo, team1.elo, 1);
+    team1.elo = updateEloRating(team1.elo, team2.elo, 0);
   }
 
   console.log(`\t\t${team1['Team']} - ${team2['Team']} [${score[0]} : ${score[1]}]`);
@@ -150,6 +193,14 @@ const rankTeams = (a, b, c) => {
   tmp.push(a, b, c);
 
   tmp.sort((a, b) => {
+    if (a.points === b.points) {
+      if ((a.goalsWon - a.goalsLost) === (b.goalsWon - b.goalsLost)) {
+        return b.goalsWon - a.goalsWon;
+      }
+
+      return (b.goalsWon - b.goalsLost) - (a.goalsWon - a.goalsLost);
+    }
+
     return b.points - a.points;
   });
 
@@ -158,8 +209,15 @@ const rankTeams = (a, b, c) => {
 
 
 const simulate = () => {
+  const [a, b, c] = [groups['A'], groups['B'], groups['C']];
+  const [d, e, f, g] = [[], [], [], []];
+
   for (let i = 0; i < 3; i++) {
     initializeValues([a, b, c][i]);
+  }
+
+  for (let i = 0; i < 3; i++) {
+    generateEloRating([a, b, c][i]);
   }
 
   console.log("Grupna faza - I kolo:");
@@ -180,6 +238,19 @@ const simulate = () => {
   for (let i = 0; i < 3; i++) {
     console.log(`\tGrupa ${['A', 'B', 'C'][i]}`);
     thirdPhase([a, b, c][i]);
+  }
+
+  for (let i = 0; i < 3; i++) {
+    [a, b, c][i].sort((a, b) => {
+      if (a.points === b.points) {
+        for (let j of a.matches) {
+          if (j.opponent === b['ISOCode']) {
+            return 0 - j.outcome;
+          }
+        }
+      }
+      return b.points - a.points;
+    });
   }
 
   console.log();
@@ -210,13 +281,9 @@ const simulate = () => {
     }
   }
 
-
   console.log('Eliminaciona faza:');
   elimination(d, g);
   elimination(e, f);
-
-
-
 
   console.log();
   console.log('Četvrtfinale:');
@@ -244,11 +311,6 @@ const simulate = () => {
   for (let i = 0; i < medals.length; i++) {
     console.log(`\t${i + 1}. ${medals[i]['Team']}`);
   }
-  for (let i = 0; i < 3; i++) {
-    rankTeams(a[i], b[i], c[i]);
-  }
-
-
 };
 
 simulate();
